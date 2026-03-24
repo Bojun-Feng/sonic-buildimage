@@ -5,6 +5,7 @@ from ipaddress import ip_interface
 from natsort import natsorted
 
 import smartswitch_config
+from sonic_py_common import device_info
 
 #TODO: Remove once Python 2 support is removed
 if sys.version_info.major == 3:
@@ -297,6 +298,85 @@ def generate_l2_config(data):
             data['VLAN_MEMBER']['Vlan1000|{}'.format(port)] = {'tagging_mode': 'untagged'}
     return data
 
+
+def is_voq_platform():
+    """Check if the platform is a VoQ platform by reading platform_env.conf."""
+    platform_env_conf_file_path = device_info.get_platform_env_conf_file_path()
+    if platform_env_conf_file_path is None:
+        return False
+    try:
+        with open(platform_env_conf_file_path) as f:
+            for line in f:
+                tokens = line.split('=')
+                if len(tokens) < 2:
+                    continue
+                if tokens[0].strip().lower() == 'voq':
+                    if tokens[1].strip() == '1':
+                        return True
+    except Exception:
+        pass
+    return False
+
+def generate_voq_system_ports(data):
+    """Generate VoQ DEVICE_METADATA and SYSTEM_PORT table from PORT data.
+
+    For VoQ platforms, the DEVICE_METADATA needs switch_type, switch_id,
+    max_cores, and asic_name. The SYSTEM_PORT table is derived from PORT
+    entries that contain core_id, core_port_id, num_voq, and speed fields.
+
+    The system_port_id for each port is calculated as:
+        port_index (0-based, in PORT iteration order) * num_voq + 1
+    This reserves num_voq queue IDs per system port in the hardware.
+
+    This targets standalone single-ASIC VoQ switches (switch_id=0, asic_name=asic0).
+    Multi-linecard or multi-ASIC chassis deployments use minigraph-based config.
+    """
+    hostname = data.get('DEVICE_METADATA', {}).get('localhost', {}).get('hostname', 'sonic')
+
+    # Generate SYSTEM_PORT table from PORT data
+    system_ports = {}
+    max_core_id = 0
+    port_index = 0
+    for port_name in natsorted(data.get('PORT', {})):
+        port_data = data['PORT'][port_name]
+        core_id = port_data.get('core_id')
+        core_port_id = port_data.get('core_port_id')
+        num_voq = int(port_data.get('num_voq', 8))
+        speed = port_data.get('speed')
+
+        # Skip ports without VoQ-related fields
+        if core_id is None or core_port_id is None:
+            continue
+
+        try:
+            max_core_id = max(max_core_id, int(core_id))
+        except (ValueError, TypeError):
+            pass
+
+        system_port_id = port_index * num_voq + 1
+        key = '{}|asic0|{}'.format(hostname, port_name)
+        system_ports[key] = {
+            'system_port_id': str(system_port_id),
+            'switch_id': '0',
+            'core_index': str(core_id),
+            'core_port_index': str(core_port_id),
+            'speed': str(speed) if speed else '400000',
+            'num_voq': str(num_voq)
+        }
+        port_index += 1
+
+    # Only add VoQ metadata and SYSTEM_PORT if valid ports were found
+    if system_ports:
+        max_cores = max_core_id + 1
+        data.setdefault('DEVICE_METADATA', {}).setdefault('localhost', {})
+        data['DEVICE_METADATA']['localhost']['switch_type'] = 'voq'
+        data['DEVICE_METADATA']['localhost']['switch_id'] = 0
+        data['DEVICE_METADATA']['localhost']['max_cores'] = max_cores
+        data['DEVICE_METADATA']['localhost']['asic_name'] = 'asic0'
+        data['SYSTEM_PORT'] = system_ports
+
+    return data
+
 _sample_generators = {
         't1': generate_t1_sample_config,
         'l2': generate_l2_config,
@@ -311,4 +391,7 @@ def get_available_config():
 
 def generate_sample_config(data, setting_name):
     data = generate_common_config(data)
-    return _sample_generators[setting_name.lower()](data)
+    data = _sample_generators[setting_name.lower()](data)
+    if is_voq_platform():
+        data = generate_voq_system_ports(data)
+    return data
