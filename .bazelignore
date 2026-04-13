@@ -32,3 +32,9 @@ src/sonic-yang-models
 # TODO(bazel-ready): Make these modules work.
 src/dhcprelay
 src/sonic-genl-packet
+
+# Third-party submodules with broken BUILD.bazel files.
+# The fmt library's BUILD.bazel lives in support/bazel/ but globs for
+# include/fmt/*.h relative to that directory instead of the repo root,
+# causing "glob didn't match anything" errors.
+platform/broadcom/sonic-platform-modules-nokia/mackinac/fmt
