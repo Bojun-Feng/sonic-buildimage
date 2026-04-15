@@ -1,0 +1,36 @@
+--- a/apt/extensions.bzl
++++ b/apt/extensions.bzl
+@@ -80,14 +80,20 @@ def _resolve_downloads(mctx, tokens, index_type, dist, comp, arch):
+     Returns None for optional Contents when all attempts fail.
+     """
+     failed_attempts = []
++    result = None
+     for (ext, cmd, url, url_idx, ext_name, output, token) in tokens:
+         download = token.wait()
+-        decompress_r = None
+-        if download.success:
++        if result != None:
++            # Already found a successful download; just draining remaining
++            # tokens so Bazel doesn't complain about pending async work.
++            continue
++        if not download.success:
++            failed_attempts.append((url + "/.../" + index_type + ext, download, None))
++            continue
++        decompress_r = mctx.execute(cmd + [output])
++        if decompress_r.return_code == 0:
++            target_triple = "{}/{}/{}".format(dist, comp, arch)
++            result = ("{}/{}/{}/{}".format(target_triple, url_idx, ext_name, index_type), url, download.integrity, ext)
++        else:
++            failed_attempts.append((url + "/.../" + index_type + ext, download, decompress_r))
+ 
+-            decompress_r = mctx.execute(cmd + [output])
+-            if decompress_r.return_code == 0:
+-                target_triple = "{}/{}/{}".format(dist, comp, arch)
+-                return ("{}/{}/{}/{}".format(target_triple, url_idx, ext_name, index_type), url, download.integrity, ext)
+-
+-        failed_attempts.append((url + "/.../" + index_type + ext, download, decompress_r))
++    if result != None:
++        return result
+ 
+     if index_type == "Contents":
+         # Contents files are optional; some repositories (e.g. packages.cloud.google.com/apt)
