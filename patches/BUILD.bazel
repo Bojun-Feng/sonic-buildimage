@@ -1,1 +1,1 @@
-exports_files([])
+exports_files(["rules_distroless_async_fix.patch"])
