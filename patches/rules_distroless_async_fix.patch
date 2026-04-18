@@ -1,6 +1,6 @@
 --- a/apt/extensions.bzl
 +++ b/apt/extensions.bzl
-@@ -80,14 +80,20 @@ def _resolve_downloads(mctx, tokens, index_type, dist, comp, arch):
+@@ -104,17 +104,25 @@
      Returns None for optional Contents when all attempts fail.
      """
      failed_attempts = []
@@ -9,6 +9,9 @@
          download = token.wait()
 -        decompress_r = None
 -        if download.success:
+-            decompress_r = mctx.execute(cmd + [output])
+-            if decompress_r.return_code == 0:
+-                target_triple = "{}/{}/{}".format(dist, comp, arch)
 +        if result != None:
 +            # Already found a successful download; just draining remaining
 +            # tokens so Bazel doesn't complain about pending async work.
@@ -23,11 +26,8 @@
 +        else:
 +            failed_attempts.append((url + "/.../" + index_type + ext, download, decompress_r))
  
--            decompress_r = mctx.execute(cmd + [output])
--            if decompress_r.return_code == 0:
--                target_triple = "{}/{}/{}".format(dist, comp, arch)
+-                # Decompressed file lives in its own ext_name subdirectory
 -                return ("{}/{}/{}/{}".format(target_triple, url_idx, ext_name, index_type), url, download.integrity, ext)
--
 -        failed_attempts.append((url + "/.../" + index_type + ext, download, decompress_r))
 +    if result != None:
 +        return result
