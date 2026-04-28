@@ -1,0 +1,38 @@
+load("@rules_oci//oci:defs.bzl", "oci_image", "oci_load")
+load("@tar.bzl", "tar")
+
+# TODO(bazel-ready): The Dockerfile applies rsyslog syslogtag customization
+# and sets IMAGE_VERSION at build time. Neither is implemented yet.
+# This is consistent with all other migrated docker images.
+# See: dockers/docker-bmp-watchdog/Dockerfile.j2 for the original behavior.
+
+tar(
+    name = "source_files",
+    srcs = [
+        "supervisord.conf",
+        "//dockers/docker-bmp-watchdog/watchdog:bmp_watchdog",
+    ],
+    mtree = [
+        "./etc/supervisor/conf.d/supervisord.conf type=file content=$(location :supervisord.conf)",
+        "./usr/bin/bmp_watchdog type=file mode=0755 content=$(location //dockers/docker-bmp-watchdog/watchdog:bmp_watchdog)",
+    ],
+)
+
+oci_image(
+    name = "docker-bmp-watchdog",
+    base = "//dockers/docker-config-engine-bookworm",
+    entrypoint = ["/usr/bin/supervisord"],
+    env = {
+        "DEBIAN_FRONTEND": "noninteractive",
+    },
+    tars = [
+        ":source_files",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+oci_load(
+    name = "load",
+    image = ":docker-bmp-watchdog",
+    repo_tags = ["docker-bmp-watchdog:latest"],
+)

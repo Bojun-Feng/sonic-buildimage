@@ -30,6 +30,29 @@ git_override(
 
 bazel_dep(name = "aspect_rules_py", version = "1.8.4")
 
+# Rust toolchain — used by docker-bmp-watchdog and future Rust targets.
+# Pin to 1.79.0 to match the version previously used in Dockerfile builds.
+bazel_dep(name = "rules_rust", version = "0.69.0")
+
+rust = use_extension("@rules_rust//rust:extensions.bzl", "rust")
+rust.toolchain(
+    edition = "2021",
+    versions = ["1.79.0"],
+)
+
+# Crate universe — shared dependency pool for all simple Rust targets (watchdogs, etc.).
+# Uses from_specs (Cargo-free) so adding a new Rust binary only requires listing its
+# unique deps here. No per-project Cargo.lock or repinning needed.
+# When heavier Rust repos (sonic-ctrmgrd-rs, sonic-swss-common/crates) are migrated,
+# they should get their own from_cargo hub with a separate name.
+crate = use_extension("@rules_rust//crate_universe:extensions.bzl", "crate")
+
+crate.spec(package = "serde", features = ["derive"], version = "1.0")
+crate.spec(package = "serde_json", version = "1.0")
+
+crate.from_specs(name = "crates")
+use_repo(crate, "crates")
+
 python = use_extension("@rules_python//python/extensions:python.bzl", "python")
 python.toolchain(python_version = "3.11.6")
 
