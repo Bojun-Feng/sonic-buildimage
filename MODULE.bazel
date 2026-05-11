@@ -40,18 +40,18 @@ rust.toolchain(
     versions = ["1.79.0"],
 )
 
-# Crate universe — shared dependency pool for all simple Rust targets (watchdogs, etc.).
-# Uses from_specs (Cargo-free) so adding a new Rust binary only requires listing its
-# unique deps here. No per-project Cargo.lock or repinning needed.
-# When heavier Rust repos (sonic-ctrmgrd-rs, sonic-swss-common/crates) are migrated,
-# they should get their own from_cargo hub with a separate name.
+# Crate universe — each Rust binary/workspace gets its own from_cargo hub, reading
+# deps from its existing Cargo.toml + Cargo.lock. This mirrors how Python sub-repos
+# each own their pyproject.toml + uv.lock, and ensures lockfile-backed reproducibility.
+# Pattern: crate.from_cargo(name = "crates_<target>", ...) per binary/workspace.
 crate = use_extension("@rules_rust//crate_universe:extensions.bzl", "crate")
 
-crate.spec(package = "serde", features = ["derive"], version = "1.0")
-crate.spec(package = "serde_json", version = "1.0")
-
-crate.from_specs(name = "crates")
-use_repo(crate, "crates")
+crate.from_cargo(
+    name = "crates_bmp_watchdog",
+    cargo_lockfile = "//dockers/docker-bmp-watchdog/watchdog:Cargo.lock",
+    manifests = ["//dockers/docker-bmp-watchdog/watchdog:Cargo.toml"],
+)
+use_repo(crate, "crates_bmp_watchdog")
 
 python = use_extension("@rules_python//python/extensions:python.bzl", "python")
 python.toolchain(python_version = "3.11.6")

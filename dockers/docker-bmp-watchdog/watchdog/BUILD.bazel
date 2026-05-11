@@ -5,8 +5,8 @@ rust_binary(
     srcs = ["src/main.rs"],
     edition = "2021",
     deps = [
-        "@crates//:serde",
-        "@crates//:serde_json",
+        "@crates_bmp_watchdog//:serde",
+        "@crates_bmp_watchdog//:serde_json",
     ],
     visibility = ["//visibility:public"],
 )
