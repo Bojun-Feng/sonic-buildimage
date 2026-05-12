@@ -1,10 +1,7 @@
 load("@rules_oci//oci:defs.bzl", "oci_image", "oci_load")
 load("@tar.bzl", "tar")
 
-# TODO(bazel-ready): The Dockerfile applies rsyslog syslogtag customization
-# and sets IMAGE_VERSION at build time. Neither is implemented yet.
-# This is consistent with all other migrated docker images.
-# See: dockers/docker-bmp-watchdog/Dockerfile.j2 for the original behavior.
+# TODO(bazel-ready): rsyslog syslogtag and IMAGE_VERSION not yet implemented.
 
 tar(
     name = "source_files",

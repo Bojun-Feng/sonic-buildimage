@@ -30,8 +30,7 @@ git_override(
 
 bazel_dep(name = "aspect_rules_py", version = "1.8.4")
 
-# Rust toolchain — used by docker-bmp-watchdog and future Rust targets.
-# Pin to 1.79.0 to match the version previously used in Dockerfile builds.
+# Rust toolchain (pinned to 1.79.0 to match prior Dockerfile builds)
 bazel_dep(name = "rules_rust", version = "0.69.0")
 
 rust = use_extension("@rules_rust//rust:extensions.bzl", "rust")
@@ -40,10 +39,7 @@ rust.toolchain(
     versions = ["1.79.0"],
 )
 
-# Crate universe — each Rust binary/workspace gets its own from_cargo hub, reading
-# deps from its existing Cargo.toml + Cargo.lock. This mirrors how Python sub-repos
-# each own their pyproject.toml + uv.lock, and ensures lockfile-backed reproducibility.
-# Pattern: crate.from_cargo(name = "crates_<target>", ...) per binary/workspace.
+# Rust crate deps — one from_cargo hub per binary/workspace.
 crate = use_extension("@rules_rust//crate_universe:extensions.bzl", "crate")
 
 crate.from_cargo(
