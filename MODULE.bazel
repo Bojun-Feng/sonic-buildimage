@@ -24,6 +24,8 @@ git_override(
     module_name = "rules_distroless",
     commit = "ebfd74a2e07b83235e064bb63ace98a1a5223e02",
     remote = "https://github.com/bazel-contrib/rules_distroless",
+    patches = ["//patches:rules_distroless_async_fix.patch"],
+    patch_strip = 1,
 )
 
 bazel_dep(name = "aspect_rules_py", version = "1.8.4")
