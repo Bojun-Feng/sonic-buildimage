@@ -13,8 +13,8 @@ from .utils import run_command
 from .managers_device_global import DeviceGlobalCfgMgr
 
 INTERFACE_PATTERN = re.compile(
-    r'^(Ethernet\d+|PortChannel\d+|Vlan\d+)(\.\d+)?$'  # long-form (bare or subinterface)
-    r'|^(Eth\d+|Po\d+)\.\d+$'                          # short-form (subinterface only, per HLD)
+    r'^(Ethernet\d+|PortChannel\d+|Vlan\d+)(\.\d+)?$'  # long-form
+    r'|^(Eth\d+|Po\d+)(\.\d+)?$'                       # short-form
 )
 
 

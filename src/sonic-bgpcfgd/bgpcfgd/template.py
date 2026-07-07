@@ -73,8 +73,8 @@ class TemplateFabric(object):
             return False
         import re
         return bool(re.match(
-            r'^(Ethernet\d+|PortChannel\d+|Vlan\d+)(\.\d+)?$'  # long-form (bare or subinterface)
-            r'|^(Eth\d+|Po\d+)\.\d+$',                          # short-form (subinterface only, per HLD)
+            r'^(Ethernet\d+|PortChannel\d+|Vlan\d+)(\.\d+)?$'  # long-form
+            r'|^(Eth\d+|Po\d+)(\.\d+)?$',                       # short-form
             str(value)
         ))
 

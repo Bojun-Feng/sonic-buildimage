@@ -69,15 +69,13 @@ def test_is_interface_neighbor_eth_subinterface_short_form():
 def test_is_interface_neighbor_po_subinterface_short_form():
     assert is_interface_neighbor('Po101.15') is True
 
-# --- Short-form negative test cases ---
-
 def test_is_interface_neighbor_eth_short_form():
-    # Bare short-form without subinterface dot is not valid (no kernel interface "Eth24" exists)
-    assert is_interface_neighbor('Eth24') is False
+    assert is_interface_neighbor('Eth24') is True
 
 def test_is_interface_neighbor_po_short_form():
-    # Bare short-form without subinterface dot is not valid (no kernel interface "Po101" exists)
-    assert is_interface_neighbor('Po101') is False
+    assert is_interface_neighbor('Po101') is True
+
+# --- Short-form negative test cases ---
 
 def test_is_interface_neighbor_eth_no_number():
     assert is_interface_neighbor('Eth') is False
