@@ -12,10 +12,10 @@ from .utils import run_command
 from .managers_device_global import DeviceGlobalCfgMgr
 
 
-def is_interface_neighbor(neighbor, ports=None, interfaces=None):
-    """Return True if neighbor is configured as an interface or has a known name form."""
-    if ports is not None or interfaces is not None:
-        if neighbor in (ports or {}):
+def is_interface_neighbor(neighbor, ports=None, interfaces=None, portchannels=None):
+    """Return True for a configured interface, or a known name form without DB data."""
+    if ports is not None or interfaces is not None or portchannels is not None:
+        if neighbor in (ports or {}) or neighbor in (portchannels or {}):
             return True
         return any(neighbor == key.split('|', 1)[0] for key in (interfaces or {}))
     return TemplateFabric.is_interface(neighbor)
@@ -165,6 +165,13 @@ class BGPPeerMgrBase(Manager):
             table_name,
         )
 
+        if self.supports_unnumbered:
+            # PORTCHANNEL is optional: subscribe for retries without making it a startup dependency.
+            self.directory.subscribe(
+                [("CONFIG_DB", "PORTCHANNEL", "")],
+                self.on_deps_change
+            )
+
         self.peers = self.load_peers()
         self.peer_group_mgr = BGPPeerGroupMgr(self.common_objs, base_template)
         return
@@ -206,8 +213,9 @@ class BGPPeerMgrBase(Manager):
 
         if self.supports_unnumbered:
             ports = self.directory.get_slot("CONFIG_DB", swsscommon.CFG_PORT_TABLE_NAME)
+            portchannels = self.directory.get_slot("CONFIG_DB", "PORTCHANNEL")
             interfaces = self.directory.get_slot("LOCAL", "interfaces")
-            interface_neighbor = is_interface_neighbor(nbr, ports, interfaces)
+            interface_neighbor = is_interface_neighbor(nbr, ports, interfaces, portchannels)
             if (not interface_neighbor
                     and not TemplateFabric.is_ipv4(nbr)
                     and not TemplateFabric.is_ipv6(nbr)):
