@@ -45,6 +45,30 @@ def test_is_interface_neighbor_portchannel_high():
 def test_is_interface_neighbor_ethernet_typical():
     assert is_interface_neighbor('Ethernet48') is True
 
+def test_is_interface_neighbor_backplane():
+    assert is_interface_neighbor('Ethernet-BP0') is True
+
+def test_is_interface_neighbor_recirc():
+    assert is_interface_neighbor('Ethernet-Rec0') is True
+
+def test_is_interface_neighbor_inband():
+    assert is_interface_neighbor('Ethernet-IB0') is True
+
+def test_is_interface_neighbor_uses_port_table():
+    ports = {'Ethernet-Future0': {}}
+    assert is_interface_neighbor('Ethernet-Future0', ports, {}) is True
+    assert is_interface_neighbor('Ethernet-Future0', {}, {}) is False
+
+def test_is_interface_neighbor_uses_interface_table():
+    interfaces = {'FutureInterface0': {}}
+    assert is_interface_neighbor('FutureInterface0', {}, interfaces) is True
+    assert is_interface_neighbor('FutureInterface0', {}, {}) is False
+
+
+def test_is_interface_neighbor_normalizes_interface_table_keys():
+    interfaces = {'PortChannel101|10.0.0.1/31': {}}
+    assert is_interface_neighbor('PortChannel101', {}, interfaces) is True
+
 def test_is_interface_neighbor_vlan_high():
     assert is_interface_neighbor('Vlan1000') is True
 
@@ -162,6 +186,31 @@ def test_peer_group_has_unnumbered():
     )
     assert 'neighbor PEER_UNNUMBERED peer-group' in result
     assert 'neighbor PEER_UNNUMBERED capability extended-nexthop' in result
+
+
+def test_internal_and_voq_unnumbered_peer_groups_are_distinct():
+    """Internal and VoQ templates must not overwrite the general peer-group."""
+    tf = TemplateFabric(TEMPLATE_PATH)
+    metadata = {
+        'localhost': {
+            'bgp_asn': '65100',
+            'sub_role': 'FrontEnd',
+            'switch_type': 'chassis-packet',
+            'type': 'LeafRouter',
+        }
+    }
+
+    internal = tf.from_file('bgpd/templates/internal/peer-group.conf.j2').render(
+        CONFIG_DB__DEVICE_METADATA=metadata
+    )
+    voq = tf.from_file('bgpd/templates/voq_chassis/peer-group.conf.j2').render(
+        CONFIG_DB__DEVICE_METADATA=metadata
+    )
+
+    assert 'neighbor INTERNAL_PEER_UNNUMBERED peer-group' in internal
+    assert 'neighbor VOQ_CHASSIS_PEER_UNNUMBERED peer-group' in voq
+    assert 'neighbor PEER_UNNUMBERED peer-group' not in internal
+    assert 'neighbor PEER_UNNUMBERED peer-group' not in voq
 
 
 def test_unnumbered_remote_as():

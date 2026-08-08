@@ -8,6 +8,8 @@ from .util import load_constants, render_constants
 from swsscommon import swsscommon
 import bgpcfgd.managers_bgp
 
+swsscommon.CFG_PORT_TABLE_NAME = "PORT"
+
 TEMPLATE_PATH = os.path.abspath('../../dockers/docker-fpm-frr/frr')
 
 def load_constant_files():
@@ -243,6 +245,7 @@ def test_add_peer_default_vrf_rejects_vnet_bound_interface(mocked_log_debug):
 def test_add_unnumbered_peer_in_vrf():
     for constant in load_constant_files():
         m = constructor(constant)
+        m.directory.put("LOCAL", "interfaces", "PortChannel101", {})
         res = m.set_handler("Vrf-10|PortChannel101", {'asn': '65200', 'name': 'TOR'})
         assert res, "Expect True return value"
         assert any(
@@ -253,6 +256,106 @@ def test_add_unnumbered_peer_in_vrf():
         assert any(
             'router bgp 65100 vrf Vrf-10' in call.args[0]
             and 'neighbor PortChannel101 interface peer-group PEER_UNNUMBERED' in call.args[0]
+            for call in m.cfg_mgr.push.call_args_list
+        )
+
+
+def test_unnumbered_peer_manager_depends_on_port_table():
+    for constant in load_constant_files():
+        port_dependency = ("CONFIG_DB", "PORT", "")
+        peer_constants = load_constants(constant)['constants']['bgp']['peers']
+        for peer_type in ("general", "internal", "voq_chassis"):
+            if peer_type in peer_constants:
+                assert port_dependency in constructor(constant, peer_type=peer_type).deps
+        for peer_type in ("dynamic", "monitors", "sentinels"):
+            if peer_type in peer_constants:
+                assert port_dependency not in constructor(constant, peer_type=peer_type).deps
+
+
+def test_add_unnumbered_peer_from_port_table():
+    for constant in load_constant_files():
+        for neighbor in ("Ethernet-Future0", "Ethernet-BP0", "Ethernet-Rec0", "Ethernet-IB0"):
+            m = constructor(constant)
+            m.directory.put("CONFIG_DB", swsscommon.CFG_PORT_TABLE_NAME, neighbor, {})
+            res = m.set_handler(neighbor, {'asn': '65200', 'name': 'TOR'})
+            assert res, "Expect True return value"
+            assert any(
+                'neighbor %s interface peer-group PEER_UNNUMBERED' % neighbor in call.args[0]
+                for call in m.cfg_mgr.push.call_args_list
+            )
+
+
+def test_add_unnumbered_peer_from_interface_table():
+    for constant in load_constant_files():
+        for neighbor in ("PortChannel101", "Vlan1000", "Eth24.15"):
+            m = constructor(constant)
+            m.directory.put("LOCAL", "interfaces", neighbor, {})
+            res = m.set_handler(neighbor, {'asn': '65200', 'name': 'TOR'})
+            assert res, "Expect True return value"
+            assert any(
+                'neighbor %s interface peer-group PEER_UNNUMBERED' % neighbor in call.args[0]
+                for call in m.cfg_mgr.push.call_args_list
+            )
+
+
+@patch('bgpcfgd.managers_bgp.log_debug')
+def test_defer_non_ip_neighbor_missing_from_interface_tables(mocked_log_debug):
+    for constant in load_constant_files():
+        m = constructor(constant)
+        res = m.set_handler("Ethernet-Future0", {'asn': '65200', 'name': 'TOR'})
+        assert not res, "Expect False return value"
+        mocked_log_debug.assert_called_with(
+            "Peer 'Ethernet-Future0' is not yet present in the PORT or interface tables"
+        )
+
+
+@patch('bgpcfgd.managers_bgp.log_err')
+def test_late_port_neighbor_converges_without_errors(mocked_log_err):
+    for constant in load_constant_files():
+        m = constructor(constant)
+        m.deps = []
+        m.wait_for_all_deps = False
+
+        m.handler(
+            "Ethernet-Future0",
+            swsscommon.SET_COMMAND,
+            {'asn': '65200', 'name': 'TOR'}
+        )
+        assert len(m.set_queue) == 1
+
+        for port in ("Ethernet0", "Ethernet4", "Ethernet8"):
+            m.directory.put("CONFIG_DB", swsscommon.CFG_PORT_TABLE_NAME, port, {})
+
+        assert len(m.set_queue) == 1
+        m.directory.put("CONFIG_DB", swsscommon.CFG_PORT_TABLE_NAME, "Ethernet-Future0", {})
+
+        assert m.set_queue == []
+        mocked_log_err.assert_not_called()
+        assert any(
+            'neighbor Ethernet-Future0 interface peer-group PEER_UNNUMBERED' in call.args[0]
+            for call in m.cfg_mgr.push.call_args_list
+        )
+
+
+def test_delete_removes_pending_peer():
+    for constant in load_constant_files():
+        m = constructor(constant)
+        m.deps = []
+        m.wait_for_all_deps = False
+
+        m.handler(
+            "Ethernet-Future0",
+            swsscommon.SET_COMMAND,
+            {'asn': '65200', 'name': 'TOR'}
+        )
+        assert len(m.set_queue) == 1
+
+        m.handler("Ethernet-Future0", swsscommon.DEL_COMMAND, {})
+        assert m.set_queue == []
+
+        m.directory.put("CONFIG_DB", swsscommon.CFG_PORT_TABLE_NAME, "Ethernet-Future0", {})
+        assert not any(
+            'neighbor Ethernet-Future0 interface peer-group PEER_UNNUMBERED' in call.args[0]
             for call in m.cfg_mgr.push.call_args_list
         )
 

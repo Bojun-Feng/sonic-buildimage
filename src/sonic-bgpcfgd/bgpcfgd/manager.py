@@ -48,6 +48,8 @@ class Manager(object):
                 log_debug("Not all dependencies are met for the Manager: %s" % self.__class__)
                 self.set_queue.append((key, data))
         elif op == swsscommon.DEL_COMMAND:
+            self.set_queue = [(queued_key, queued_data) for queued_key, queued_data in self.set_queue
+                              if queued_key != key]
             self.del_handler(key)
         else:
             log_err("Invalid operation '%s' for key '%s'" % (op, key))

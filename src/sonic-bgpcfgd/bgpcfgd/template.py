@@ -4,6 +4,7 @@ from functools import partial
 import jinja2
 import netaddr
 import os
+import re
 
 from .log import log_err
 
@@ -68,12 +69,12 @@ class TemplateFabric(object):
 
     @staticmethod
     def is_interface(value):
-        """ Return True if the value is an interface name (Ethernet/Eth, PortChannel/Po, Vlan) """
+        """Return True if value has a known SONiC interface-name form."""
         if not value:
             return False
-        import re
         return bool(re.match(
             r'^(Ethernet\d+|PortChannel\d+|Vlan\d+)(\.\d+)?$'  # long-form (bare or subinterface)
+            r'|^Ethernet-(BP|IB|Rec)\d+$'                       # multi-ASIC physical ports
             r'|^(Eth\d+|Po\d+)\.\d+$',                          # short-form (subinterface only, per HLD)
             str(value)
         ))

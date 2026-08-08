@@ -6,8 +6,8 @@
   neighbor {{ neighbor_addr }} timers 3 10
   neighbor {{ neighbor_addr }} timers connect 10
 !
-{% if neighbor_addr | is_interface %}
-  neighbor {{ neighbor_addr }} interface peer-group PEER_UNNUMBERED
+{% if is_interface_neighbor | default(neighbor_addr | is_interface) %}
+  neighbor {{ neighbor_addr }} interface peer-group INTERNAL_PEER_UNNUMBERED
 {% if bgp_session.get('address_family', 'both') in ['both', 'v4'] %}
   address-family ipv4
 {%   if 'rrclient' in bgp_session and bgp_session['rrclient'] | int != 0 %}
